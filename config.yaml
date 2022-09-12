@@ -1,0 +1,3 @@
+inputFile: "~/test.m3u8"
+outputFile: "~/test mod.m3u8"
+newExt: ".m4a"
