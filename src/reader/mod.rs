@@ -1,6 +1,7 @@
 use std::{fs::File, io::BufRead, io::BufReader};
 
 use crossbeam::channel::{Receiver, Sender};
+use unicode_bom::Bom;
 
 use crate::error::Error;
 
@@ -9,11 +10,20 @@ pub fn read_entries(
     task_tx: Sender<String>,
     task_quit_rx: Receiver<()>,
 ) -> Result<(), Error> {
-    let in_file = File::open(shellexpand::tilde(input_file).as_ref()).map_err(|err| Error {
+    let input_file = shellexpand::tilde(input_file);
+    let in_file = File::open(input_file.as_ref()).map_err(|err| Error {
         message: format!("failed to open the input file '{}': {}", input_file, err),
     })?;
 
-    let in_stream = BufReader::new(in_file);
+    let bom = detect_bom(input_file.as_ref());
+    let mut in_stream = BufReader::new(in_file);
+
+    if let Bom::Utf8 = bom {
+        // Skip the first 3 bytes if there's a UTF-8 BOM
+        in_stream.seek_relative(3).map_err(|err| Error {
+            message: format!("failed to read the input file: {}", err),
+        })?;
+    }
 
     for line in in_stream.lines() {
         let line = line.map_err(|err| Error {
@@ -42,4 +52,9 @@ pub fn read_entries(
 
 fn end_task_tx(task_tx: &Sender<String>) {
     let _ = task_tx.send(Default::default());
+}
+
+fn detect_bom(input_file: &str) -> Bom {
+    let mut in_file = File::open(input_file).unwrap();
+    Bom::from(&mut in_file)
 }
