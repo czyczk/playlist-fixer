@@ -19,6 +19,35 @@ impl std::fmt::Display for Config {
     }
 }
 
+impl Config {
+    pub fn validate(&self) -> Result<(), Error> {
+        if self.input_file.is_empty() {
+            return Err(Error {
+                message: "`inputFile` is empty".to_string(),
+            });
+        }
+        if self.output_file.is_empty() {
+            return Err(Error {
+                message: "`outputFile` is empty".to_string(),
+            });
+        }
+        if self.new_ext.is_empty() {
+            return Err(Error {
+                message: "`newExt` is empty".to_string(),
+            });
+        }
+
+        // `inputFile` shouldn't be the same as `outputFile`
+        if self.input_file == self.output_file {
+            return Err(Error {
+                message: "`inputFile` shouldn't be the same as `outputFile`".to_string(),
+            });
+        }
+
+        Ok(())
+    }
+}
+
 pub fn load_conf(path: &str) -> Result<Config, Error> {
     let file = File::open(path).map_err(|err| Error {
         message: format!("failed to load the config file: {}", err),
@@ -74,5 +103,68 @@ mod tests {
 
         let result = super::parse_conf(Box::new(stream));
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_validate_with_valid_conf() {
+        let config = super::Config {
+            input_file: "/path/to/input.m3u8".to_string(),
+            output_file: "/path/to/output.m3u8".to_string(),
+            new_ext: ".m4a".to_string(),
+        };
+
+        let result = config.validate();
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_validate_with_invalid_conf() {
+        {
+            // `inputFile` shouldn't be empty.
+            let config = super::Config {
+                input_file: "".to_string(),
+                output_file: "".to_string(),
+                new_ext: "".to_string(),
+            };
+
+            let result = config.validate();
+            assert!(result.is_err());
+        }
+
+        {
+            // `outputFile` shouldn't be empty.
+            let config = super::Config {
+                input_file: "/path/to/input.m3u8".to_string(),
+                output_file: "".to_string(),
+                new_ext: "".to_string(),
+            };
+
+            let result = config.validate();
+            assert!(result.is_err());
+        }
+
+        {
+            // `newExt` shouldn't be empty.
+            let config = super::Config {
+                input_file: "/path/to/input.m3u8".to_string(),
+                output_file: "/path/to/output.m3u8".to_string(),
+                new_ext: "".to_string(),
+            };
+
+            let result = config.validate();
+            assert!(result.is_err());
+        }
+
+        {
+            // `inputFile` shouldn't be the same as `outputFile`.
+            let config = super::Config {
+                input_file: "/path/to/input.m3u8".to_string(),
+                output_file: "/path/to/input.m3u8".to_string(),
+                new_ext: ".m4a".to_string(),
+            };
+
+            let result = config.validate();
+            assert!(result.is_err());
+        }
     }
 }
